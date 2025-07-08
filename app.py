@@ -17,6 +17,12 @@ from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 st.set_page_config(page_title="Analisis Sentimen Pawon", layout="wide")
 st.markdown("""
     <style>
+    body {
+        background-color: white !important;
+    }
+    .main {
+        background-color: white !important;
+    }
     .main-title {font-size:42px; font-weight:bold; color:#4CAF50; text-align:center;}
     .sub-title {font-size:20px; color:#666; text-align:center; margin-bottom:2em;}
     .highlight {background:#f0f7ff; border-radius:5px; padding:15px; margin:15px 0;}
