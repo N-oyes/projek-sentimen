@@ -107,6 +107,14 @@ X = vectorizer.fit_transform(df['cleaned_text']).toarray()
 y = df['sentiment'].values
 texts = df['cleaned_text'].values
 
+# Check shapes and types
+print("Shape of X:", X.shape)
+print("Shape of y:", y.shape)
+print("NaN values in X:", np.isnan(X).sum())
+print("NaN values in y:", np.isnan(y).sum())
+print("Data type of X:", X.dtype)
+print("Data type of y:", y.dtype)
+
 # Check if y has more than one unique class
 if len(np.unique(y)) > 1:
     ros = RandomOverSampler(random_state=42)
@@ -117,9 +125,6 @@ else:
     # If only one class, no need for oversampling
     X_resampled, y_resampled, texts_resampled = X, y, texts
     resampled_indices = np.arange(len(y))
-
-df_oversampled = pd.DataFrame({'sentiment': y_resampled})
-df_oversampled['sentimen_label'] = df_oversampled['sentiment'].map(sentiment_labels)
 
 # -------------------- SPLIT & TRAINING --------------------
 indices = np.arange(len(X_resampled))
