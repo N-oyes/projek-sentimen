@@ -262,7 +262,7 @@ with tab2:
     ))
 
     st.subheader("🔍 Analisis Kesalahan Prediksi")
-   mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+    mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
 
 if not mismatch.empty:
     st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
