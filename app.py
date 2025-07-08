@@ -11,7 +11,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from wordcloud import WordCloud
-from imblearn.over_sampling import SMOTE  # Ganti RandomOverSampler dengan SMOTE
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from collections import Counter
 from sklearn.utils import resample  # Untuk manual oversampling
@@ -117,12 +116,13 @@ X = vectorizer.fit_transform(df['cleaned_text']).toarray()
 y = df['sentiment'].values
 texts = df['cleaned_text'].values
 
-# SOLUSI: Ganti RandomOverSampler dengan metode manual
+# SOLUSI: Manual oversampling tanpa imbalanced-learn
 # Hitung jumlah maksimum sampel
-max_size = df['sentimen_label'].value_counts().max()
+counts = df['sentimen_label'].value_counts()
+max_size = counts.max()
 
 # Lakukan oversampling manual untuk setiap kelas
-dfs = []
+resampled_data = []
 for label in [0, 1, 2]:
     df_class = df[df['sentiment'] == label]
     if len(df_class) < max_size:
@@ -131,10 +131,10 @@ for label in [0, 1, 2]:
                            replace=True, 
                            n_samples=max_size, 
                            random_state=42)
-    dfs.append(df_class)
+    resampled_data.append(df_class)
 
 # Gabungkan hasil oversampling
-df_oversampled = pd.concat(dfs)
+df_oversampled = pd.concat(resampled_data)
 
 # Ekstrak fitur untuk data yang sudah dioversampling
 X_resampled = vectorizer.transform(df_oversampled['cleaned_text']).toarray()
