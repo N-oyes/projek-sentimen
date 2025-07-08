@@ -107,13 +107,14 @@ X = vectorizer.fit_transform(df['cleaned_text']).toarray()
 y = df['sentiment'].values
 texts = df['cleaned_text'].values
 
+# Check if y has more than one unique class
 if len(np.unique(y)) > 1:
     ros = RandomOverSampler(random_state=42)
     X_resampled, y_resampled = ros.fit_resample(X, y)
     resampled_indices = ros.sample_indices_
     texts_resampled = texts[resampled_indices]
 else:
-    # Jika hanya 1 kelas, tidak perlu oversampling
+    # If only one class, no need for oversampling
     X_resampled, y_resampled, texts_resampled = X, y, texts
     resampled_indices = np.arange(len(y))
 
