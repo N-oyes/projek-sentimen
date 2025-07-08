@@ -1,3 +1,4 @@
+# -------------------- IMPORT LIBRARY --------------------
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -12,142 +13,152 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from wordcloud import WordCloud
 from imblearn.over_sampling import RandomOverSampler
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
+from collections import Counter
 
-# -------------------- PAGE CONFIG --------------------
+# -------------------- KONFIGURASI HALAMAN --------------------
 st.set_page_config(page_title="Analisis Sentimen Pawon", layout="wide")
+
 st.markdown("""
     <style>
-    body {
-        background-color: white !important;
+    .main-title {
+        font-size: 42px;
+        font-weight: bold;
+        color: #4CAF50;
+        text-align: center;
+        margin-bottom: 0.2em;
     }
-    .main {
-        background-color: white !important;
+    .sub-title {
+        font-size: 20px;
+        color: #666;
+        text-align: center;
+        margin-bottom: 2em;
     }
-    .main-title {font-size:42px; font-weight:bold; color:#4CAF50; text-align:center;}
-    .sub-title {font-size:20px; color:#666; text-align:center; margin-bottom:2em;}
-    .highlight {background:#f0f7ff; border-radius:5px; padding:15px; margin:15px 0;}
+    .highlight {
+        background-color: #f0f7ff;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
     </style>
 """, unsafe_allow_html=True)
+
 st.markdown('<div class="main-title">📊 Analisis Sentimen Pawon Mbah Gito</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">Menggunakan Metode Naive Bayes</div>', unsafe_allow_html=True)
 
-# -------------------- LOAD & CLEAN --------------------
+# -------------------- LOAD DATA --------------------
 try:
-    df = pd.read_csv("dataset_pawon.csv", encoding="utf-8")
+    df = pd.read_csv("dataset_pawon.csv", encoding='utf-8')
 except UnicodeDecodeError:
-    df = pd.read_csv("dataset_pawon.csv", encoding="ISO-8859-1")
+    df = pd.read_csv("dataset_pawon.csv", encoding='ISO-8859-1')
 except FileNotFoundError:
     st.error("❌ File 'dataset_pawon.csv' tidak ditemukan.")
     st.stop()
 
-df.columns = ["Ulasan", "Rating"]
-df = df.dropna(subset=["Ulasan"])
-df = df[df["Ulasan"].str.strip() != ""]
+df.columns = ['Ulasan', 'Rating']
 
 # -------------------- PREPROCESSING --------------------
 stemmer = StemmerFactory().create_stemmer()
+
 stopwords = set([
-    'yang','dan','di','ke','dari','untuk','dengan','pada','dalam','karena',
-    'atau','seperti','jadi','agar','supaya','walaupun','meskipun','namun',
-    'tetapi','bahkan','maupun','hingga','antara','tanpa','selama','sejak',
-    'terhadap','oleh','saya','aku','kami','kita','anda','kamu','mereka',
-    'nya','ia','saja','pun','sih','dong','nih','wah','apa','siapa','dimana',
-    'kapan','mengapa','bagaimana','juga','lagi','adalah','itu','ini','ya',
-    'kalau','semua','setiap','hanya','sudah','telah','pernah','sedang',
-    'tersebut','lalu','dll','tsb'
+    # Preposisi & konjungsi
+    'yang', 'dan', 'di', 'ke', 'dari', 'untuk', 'dengan', 'pada', 'dalam', 
+    'karena', 'atau', 'seperti', 'jadi', 'agar', 'supaya', 'walaupun', 'meskipun', 
+    'namun', 'tetapi', 'bahkan', 'maupun', 'hingga', 'antara', 'tanpa', 'selama', 
+    'sejak', 'terhadap', 'oleh', 
+    
+    # Kata ganti & partikel
+    'saya', 'aku', 'kami', 'kita', 'anda', 'kamu', 'mereka', 'nya', 'ia', 'saja', 
+    'pun', 'sih', 'dong', 'nih', 'wah', 
+    
+    # Kata tanya
+    'apa', 'siapa', 'dimana', 'kapan', 'mengapa', 'bagaimana', 
+    
+    # Adverbia & lainnya
+    'juga', 'lagi', 'adalah', 'itu', 'ini', 'ya', 'kalau', 'semua', 'setiap', 
+    'hanya', 'sudah', 'telah', 'pernah', 'sedang', 'tersebut', 'lalu', 'dll', 'tsb'
 ])
 
 def preprocess_text(text):
-    text = text.lower()
-    text = re.sub(r'[^a-z\s]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    words = [w for w in text.split() if w not in stopwords]
-    return stemmer.stem(" ".join(words))
+    text = text.lower()  # lowercase
+    text = re.sub(r'[^a-z\s]', '', text)  # hapus karakter non-alfabet
+    text = re.sub(r'\s+', ' ', text).strip()  # hapus spasi berlebih
+    words = [word for word in text.split() if word not in stopwords]  # hapus stopword
+    return stemmer.stem(' '.join(words))  # stemming
 
-@st.cache_data(show_spinner="🔄 Sedang preprocessing...")
-def preprocess_all(series):
-    return [preprocess_text(t) for t in series]
+@st.cache_data(show_spinner="🔄 Sedang melakukan preprocessing...")
+def preprocess_all_texts(text_series):
+    return [preprocess_text(text) for text in text_series]
 
-df["cleaned_text"] = preprocess_all(df["Ulasan"].astype(str))
-
-def convert_rating_to_sentiment(r):
+def convert_rating_to_sentiment(rating):
     try:
-        r = int(r)
-        if r in [1, 2]:   return 0
-        elif r == 3:      return 1
-        elif r in [4, 5]: return 2
+        rating = int(rating)
+        if rating in [1, 2]: return 0
+        elif rating == 3: return 1
+        elif rating in [4, 5]: return 2
+        else: return None  # Handle invalid ratings
     except:
         return None
 
-df["sentiment"] = df["Rating"].apply(convert_rating_to_sentiment)
-df = df.dropna(subset=["sentiment"])
-df["sentiment"] = df["sentiment"].astype(int)
+# Bersihkan data
+df = df.dropna(subset=['Ulasan'])
+df = df[df['Ulasan'].str.strip() != '']
+df['cleaned_text'] = preprocess_all_texts(df['Ulasan'].astype(str))
+df['sentiment'] = df['Rating'].apply(convert_rating_to_sentiment)
+df = df.dropna(subset=['sentiment'])  # Hapus baris dengan sentiment None
+df = df[df['cleaned_text'].str.strip() != '']  # Hapus teks kosong
 
-sentiment_labels = {0: "Negatif", 1: "Netral", 2: "Positif"}
-df["sentimen_label"] = df["sentiment"].map(sentiment_labels)
+sentiment_labels = {0: 'Negatif', 1: 'Netral', 2: 'Positif'}
+df['sentimen_label'] = df['sentiment'].map(sentiment_labels)
 
-# -------------------- OVERSAMPLING AT DF LEVEL --------------------
+# -------------------- TF-IDF + OVERSAMPLING --------------------
+vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
+X = vectorizer.fit_transform(df['cleaned_text']).toarray()
+y = df['sentiment'].values
+texts = df['cleaned_text'].values
+
 ros = RandomOverSampler(random_state=42)
-X_df = df[["Ulasan", "cleaned_text"]]
-y_df = df["sentiment"]
+X_resampled, y_resampled = ros.fit_resample(X, y)
+resampled_indices = ros.sample_indices_
+texts_resampled = texts[resampled_indices]
 
-X_res_df, y_res = ros.fit_resample(X_df, y_df)
-raw_resampled  = X_res_df["Ulasan"].values
-texts_resampled = X_res_df["cleaned_text"].values
-y_resampled    = y_res.values
+df_oversampled = pd.DataFrame({'sentiment': y_resampled})
+df_oversampled['sentimen_label'] = df_oversampled['sentiment'].map(sentiment_labels)
 
-df_oversampled = pd.DataFrame({
-    "Ulasan": raw_resampled,
-    "cleaned_text": texts_resampled,
-    "sentiment": y_resampled
-})
-df_oversampled["sentimen_label"] = df_oversampled["sentiment"].map(sentiment_labels)
-
-# -------------------- TF-IDF & TRAIN-TEST SPLIT --------------------
-vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1,2))
-X_resampled = vectorizer.fit_transform(texts_resampled).toarray()
-
-# split raw and cleaned texts in sync with features
-X_train, X_test, y_train, y_test, raw_train, raw_test, text_train, text_test = train_test_split(
-    X_resampled, y_resampled,
-    raw_resampled, texts_resampled,
-    test_size=0.2, random_state=42, stratify=y_resampled
+# -------------------- SPLIT & TRAINING --------------------
+indices = np.arange(len(X_resampled))
+X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(
+    X_resampled, y_resampled, indices, test_size=0.2, random_state=42, stratify=y_resampled
 )
 
 model = MultinomialNB()
 model.fit(X_train, y_train)
-y_pred  = model.predict(X_test)
-y_proba = model.predict_proba(X_test)
+y_pred = model.predict(X_test)
 
-acc         = accuracy_score(y_test, y_pred)
-report      = classification_report(y_test, y_pred,
-                                    target_names=["Negatif","Netral","Positif"],
-                                    output_dict=True)
+acc = accuracy_score(y_test, y_pred)
+report = classification_report(y_test, y_pred, target_names=['Negatif', 'Netral', 'Positif'], output_dict=True)
 conf_matrix = confusion_matrix(y_test, y_pred)
 
-# prepare results DataFrame
+# Buat DataFrame untuk hasil prediksi
 df_result = pd.DataFrame({
-    "Teks Asli": raw_test,
-    "Teks Bersih": text_test,
-    "Aktual": y_test,
-    "Prediksi": y_pred,
-    "Confidence": y_proba.max(axis=1)
+    'Teks Asli': df.iloc[resampled_indices[idx_test]]['Ulasan'].values,
+    'Teks Bersih': texts_resampled[idx_test],
+    'Aktual': y_test,
+    'Prediksi': y_pred
 })
-df_result["Aktual_Label"]   = df_result["Aktual"].map(sentiment_labels)
-df_result["Prediksi_Label"] = df_result["Prediksi"].map(sentiment_labels)
+df_result['Aktual_Label'] = df_result['Aktual'].map(sentiment_labels)
+df_result['Prediksi_Label'] = df_result['Prediksi'].map(sentiment_labels)
 
-# -------------------- BUILD UI WITH TABS --------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "📄 Data", "📈 Evaluasi", "☁️ Word Cloud",
-    "🔍 Prediksi Manual", "🧠 Fitur Penting"
-])
+# -------------------- TABS --------------------
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Data", "📈 Evaluasi", "☁️ Word Cloud", "🔍 Prediksi Manual", "🧠 Fitur Penting"])
 
-# TAB 1: Data
+# -------------------- TAB 1: DATA --------------------
 with tab1:
-    st.subheader("📄 Data & Preprocessing")
-    with st.expander("ℹ️ Info Dataset"):
-         st.markdown("""
-        <div class="">
+    st.subheader("📄 Data Awal dan Hasil Preprocessing")
+    
+    with st.expander("ℹ️ Informasi Dataset"):
+        st.markdown("""
+        <div class="highlight">
+        <b>Dataset Ulasan Restoran Pawon Mbah Gito</b><br>
         - <b>Data</b>: 2154<br>
         - <b>Ulasan</b>: Teks ulasan pelanggan<br>
         - <b>Rating</b>: Nilai rating 1-5<br>
@@ -155,176 +166,287 @@ with tab1:
 
         </div>
         """, unsafe_allow_html=True)
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("**Contoh Data Asli**")
-        st.dataframe(df[["Ulasan","Rating"]].head(5), use_container_width=True)
-    with c2:
-        st.markdown("**Contoh Cleaned**")
-        st.dataframe(df[["cleaned_text","sentimen_label"]].head(5), use_container_width=True)
-
-    st.subheader("Distribusi Sentimen")
-    c1, c2 = st.columns(2)
-    with c1:
-        fig1 = px.pie(df, names="sentimen_label",
-                      title="Sebelum Oversampling", hole=0.4,
-                      color="sentimen_label",
-                      color_discrete_map={
-                          "Negatif":"#EF553B",
-                          "Netral":"#636EFA",
-                          "Positif":"#00CC96"
-                      })
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("**📌 Contoh Data Asli:**")
+        st.dataframe(df[['Ulasan', 'Rating']].head(5), use_container_width=True)
+        
+    with col2:
+        st.markdown("**🧹 Contoh Hasil Preprocessing:**")
+        st.dataframe(df[['cleaned_text', 'sentimen_label']].head(5), use_container_width=True)
+    
+    st.subheader("📊 Distribusi Sentimen")
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("**Sebelum Oversampling**")
+        fig1 = px.pie(df, names='sentimen_label', title='Distribusi Sentimen Awal', 
+                      hole=0.4, color='sentimen_label',
+                      color_discrete_map={'Negatif': '#EF553B', 'Netral': '#636EFA', 'Positif': '#00CC96'})
         st.plotly_chart(fig1, use_container_width=True)
-    with c2:
-        fig2 = px.pie(df_oversampled, names="sentimen_label",
-                      title="Sesudah Oversampling", hole=0.4,
-                      color="sentimen_label",
-                      color_discrete_map={
-                          "Negatif":"#EF553B",
-                          "Netral":"#636EFA",
-                          "Positif":"#00CC96"
-                      })
+        
+    with col2:
+        st.markdown("**Setelah Oversampling**")
+        fig2 = px.pie(df_oversampled, names='sentimen_label', title='Distribusi Setelah Oversampling', 
+                      hole=0.4, color='sentimen_label',
+                      color_discrete_map={'Negatif': '#EF553B', 'Netral': '#636EFA', 'Positif': '#00CC96'})
         st.plotly_chart(fig2, use_container_width=True)
 
-# TAB 2: Evaluasi
+# -------------------- TAB 2: EVALUASI --------------------
 with tab2:
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("🎯 Akurasi", f"{acc:.2%}")
-        st.markdown("**📋 Classification Report**")
-        rpt_df = pd.DataFrame(report).transpose()
-        st.dataframe(rpt_df.style.format({
-            "precision":"{:.2f}",
-            "recall":"{:.2f}",
-            "f1-score":"{:.2f}",
-            "support":"{:.0f}"
-        }), use_container_width=True)
-    with c2:
-        st.markdown("**🧩 Confusion Matrix**")
-        fig, ax = plt.subplots(figsize=(5,4))
-        sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues",
-                    xticklabels=["Negatif","Netral","Positif"],
-                    yticklabels=["Negatif","Netral","Positif"])
-        ax.set_xlabel("Prediksi"); ax.set_ylabel("Aktual")
-        st.pyplot(fig)
+    col1, col2 = st.columns([1, 1])
 
-    st.markdown("### 🧠 Interpretasi")
-    st.markdown(f"- Akurasi keseluruhan: **{acc:.2%}**")
-    for lbl in ["Negatif","Netral","Positif"]:
-        p = report[lbl]["precision"]; r = report[lbl]["recall"]; f1 = report[lbl]["f1-score"]
-        st.markdown(f"  - **{lbl}**: precision {p:.2f}, recall {r:.2f}, f1 {f1:.2f}")
+    with col1:
+        st.metric(label="🎯 Akurasi Model", value=f"{acc:.2%}")
+        
+        st.markdown("**📋 Classification Report:**")
+        report_df = pd.DataFrame(report).transpose()
+        st.dataframe(report_df.style.format({'precision': '{:.2f}', 'recall': '{:.2f}', 
+                                          'f1-score': '{:.2f}', 'support': '{:.0f}'}), 
+                   use_container_width=True)
+        
+        st.markdown("""
+        <div class="highlight">
+        <b>Penjelasan:</b> Tabel ini menunjukkan metrik evaluasi utama, yaitu precision, recall, dan f1-score untuk setiap kelas sentimen.<br>
+        - <b>Precision</b>: Seberapa tepat prediksi model pada masing-masing kelas (minim false positive).<br>
+        - <b>Recall</b>: Seberapa lengkap model mendeteksi data di kelas tersebut (minim false negative).<br>
+        - <b>F1-score</b>: Gabungan precision dan recall.<br>
+        Nilai yang tinggi menandakan performa yang baik.
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.subheader("🔍 Error Analysis")
-    mism = df_result[df_result["Aktual"] != df_result["Prediksi"]]
-    st.markdown(f"Total kesalahan: **{len(mism)}** dari **{len(df_result)}**")
-    if not mism.empty:
-        st.dataframe(mism[["Teks Asli","Aktual_Label","Prediksi_Label"]].head(5),
+    with col2:
+        st.markdown("**🧩 Confusion Matrix:**")
+        fig_cm, ax_cm = plt.subplots(figsize=(8, 6))
+        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=['Negatif', 'Netral', 'Positif'],
+                    yticklabels=['Negatif', 'Netral', 'Positif'])
+        ax_cm.set_xlabel("Predicted")
+        ax_cm.set_ylabel("Actual")
+        plt.title('Confusion Matrix')
+        st.pyplot(fig_cm)
+        
+        st.markdown("""
+        <div class="highlight">
+        <b>Penjelasan:</b> Confusion Matrix menunjukkan jumlah prediksi yang benar (diagonal) dan salah (di luar diagonal).<br>
+        Jika kotak diagonal besar, artinya model berhasil memprediksi dengan baik pada kelas tersebut.<br>
+        Nilai di luar diagonal menunjukkan kesalahan klasifikasi antar kelas.
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    ### 🧠 Interpretasi Hasil Evaluasi
+
+    Model Naive Bayes menunjukkan performa yang **sangat baik** secara keseluruhan dengan **akurasi sebesar {:.2f}%**.
+
+    #### 📋 Classification Report:
+    - **Negatif**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+      → Model sangat baik dalam mengenali ulasan negatif, dengan recall hampir sempurna.
+    - **Netral**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+      → Model cukup akurat dalam menangkap ulasan netral, meskipun ada sedikit overlap dengan kelas lain.
+    - **Positif**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+      → Model sangat yakin saat memprediksi positif, tapi masih sering keliru mengklasifikasikan ulasan positif sebagai netral atau negatif.
+
+    #### 🧩 Confusion Matrix:
+    - Hampir semua ulasan **negatif** dan **netral** diprediksi dengan benar.
+    - Namun, **ulasan positif** sering dikira netral atau bahkan negatif.
+    - Ini menunjukkan bahwa model masih kesulitan membedakan ekspresi positif yang halus dari netral.
+
+    """.format(
+        acc*100,
+        report['Negatif']['precision'], report['Negatif']['recall'], report['Negatif']['f1-score'],
+        report['Netral']['precision'], report['Netral']['recall'], report['Netral']['f1-score'],
+        report['Positif']['precision'], report['Positif']['recall'], report['Positif']['f1-score']
+    ))
+
+    st.subheader("🔍 Analisis Kesalahan Prediksi")
+    mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+    
+    if not mismatch.empty:
+        st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
+        st.dataframe(mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']].head(min(5, len(mismatch))), 
                      use_container_width=True)
     else:
-        st.success("Semua prediksi benar!")
+        st.success("✅ Tidak ada kesalahan prediksi!")
 
-# TAB 3: Word Cloud
+ # 🔍 Kesimpulan:
+    # Model sangat baik dalam mengenali ulasan negatif dan netral, namun perlu ditingkatkan dalam membedakan ulasan positif yang tidak eksplisit.
+    # Preprocessing tambahan seperti lemmatization atau penyesuaian stopwords bisa membantu meningkatkan performa di kelas positif.
+
+# -------------------- TAB 3: WORD CLOUD --------------------
 with tab3:
     st.subheader("☁️ Word Cloud per Sentimen")
-    cols = st.columns(3)
-    cmap = {"Negatif":"Reds","Netral":"Blues","Positif":"Greens"}
-    for i, lbl in enumerate([0,1,2]):
-        with cols[i]:
-            name = sentiment_labels[lbl]
-            texts = df[df["sentiment"] == lbl]["cleaned_text"]
-            if texts.empty:
-                st.warning(f"Tidak ada data untuk {name}")
-            else:
-                wc = WordCloud(width=400, height=300,
-                               background_color="white",
-                               colormap=cmap[name],
-                               max_words=50
-                              ).generate(" ".join(texts))
-                fig, ax = plt.subplots(figsize=(5,4))
-                ax.imshow(wc, interpolation="bilinear")
+    col1, col2, col3 = st.columns(3)
+    
+    sentiment_colors = {
+        'Negatif': 'Reds',
+        'Netral': 'Blues',
+        'Positif': 'Greens'
+    }
+    
+    for label, name, col in zip([0, 1, 2], ['Negatif', 'Netral', 'Positif'], [col1, col2, col3]):
+        with col:
+            text_data = df[df['sentiment'] == label]['cleaned_text']
+            if not text_data.empty:
+                text = ' '.join(text_data)
+                wordcloud = WordCloud(
+                    width=400, 
+                    height=300, 
+                    background_color='white',
+                    colormap=sentiment_colors[name],
+                    max_words=50
+                ).generate(text)
+                
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.imshow(wordcloud, interpolation='bilinear')
                 ax.axis("off")
+                ax.set_title(f"Kata Kunci {name}")
                 st.pyplot(fig)
+            else:
+                st.warning(f"Tidak ada data untuk sentimen {name}")
 
-# TAB 4: Manual Prediction
+# -------------------- TAB 4: PREDIKSI MANUAL --------------------
 with tab4:
-    st.subheader("🔍 Prediksi Manual")
-    user_input = st.text_area("Masukkan ulasan:", height=150)
-    if st.button("Prediksi"):
-        if not user_input.strip():
-            st.warning("Mohon masukkan teks.")
-        else:
-            cleaned = preprocess_text(user_input)
-            vec     = vectorizer.transform([cleaned]).toarray()
-            pred    = model.predict(vec)[0]
-            proba   = model.predict_proba(vec)[0]
-            c1, c2 = st.columns([1,2])
-            with c1:
-                st.markdown("**Hasil Preprocessing**")
-                st.code(cleaned, language="text")
-                st.success(f"Prediksi: **{sentiment_labels[pred]}**")
-                st.metric("Confidence", f"{proba.max()*100:.1f}%")
-            with c2:
-                prob_df = pd.DataFrame({
-                    "Sentimen": ["Negatif","Netral","Positif"],
-                    "Probabilitas": proba
-                })
-                fig = px.bar(prob_df, x="Sentimen", y="Probabilitas",
-                             color="Sentimen",
-                             color_discrete_map={
-                                 "Negatif":"#EF553B",
-                                 "Netral":"#636EFA",
-                                 "Positif":"#00CC96"
-                             },
-                             text="Probabilitas", height=300)
-                fig.update_traces(texttemplate="%{text:.3f}", textposition="outside")
-                fig.update_layout(yaxis_title="Probabilitas", showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+    st.subheader("🔍 Coba Prediksi Manual")
+    
+    with st.expander("💡 Tips Ulasan Contoh"):
+        st.markdown("""
+        - **Positif**: "Rasanya enak banget, pelayanan ramah dan harga terjangkau"
+        - **Netral**: “Makanan disajikan dalam piring biasa, tidak terlalu besar atau kecil.”
+        - **Negatif**: "Kebersihannya kurang, bahkan saya melihat meja yang belum dibersihkan.”
 
-# TAB 5: Feature Importance
+        """)
+    
+    user_input = st.text_area("Masukkan ulasan:", height=150)
+    
+    if st.button("Prediksi", type="primary"):
+        if not user_input.strip():
+            st.warning("⚠️ Mohon masukkan teks ulasan terlebih dahulu.")
+        else:
+            with st.spinner("🔄 Sedang memproses ulasan..."):
+                try:
+                    cleaned = preprocess_text(user_input)
+                    vectorized = vectorizer.transform([cleaned]).toarray()
+                    prediction = model.predict(vectorized)[0]
+                    probs = model.predict_proba(vectorized)[0]
+                    
+                    col1, col2 = st.columns([1, 2])
+                    
+                    with col1:
+                        st.markdown(f"**🧹 Hasil Preprocessing:**")
+                        st.code(cleaned, language='text')
+                        
+                        st.success(f"✅ Prediksi Sentimen: **{sentiment_labels[prediction]}**")
+                        st.metric("Confidence Score", f"{max(probs)*100:.1f}%")
+                    
+                    with col2:
+                        st.markdown("**📊 Distribusi Probabilitas:**")
+                        prob_df = pd.DataFrame({
+                            'Sentimen': ['Negatif', 'Netral', 'Positif'],
+                            'Probabilitas': probs
+                        })
+                        
+                        fig_prob = px.bar(
+                            prob_df, 
+                            x='Sentimen', 
+                            y='Probabilitas',
+                            color='Sentimen',
+                            color_discrete_map={
+                                'Negatif': '#EF553B', 
+                                'Netral': '#636EFA', 
+                                'Positif': '#00CC96'
+                            },
+                            text='Probabilitas',
+                            height=300
+                        )
+                        fig_prob.update_traces(texttemplate='%{text:.3f}', textposition='outside')
+                        fig_prob.update_layout(
+                            yaxis_title='Probabilitas',
+                            xaxis_title='',
+                            showlegend=False
+                        )
+                        st.plotly_chart(fig_prob, use_container_width=True)
+                        
+                except Exception as e:
+                    st.error(f"❌ Terjadi kesalahan saat memproses: {e}")
+
+# -------------------- TAB 5: FITUR PENTING --------------------
 with tab5:
-    st.subheader("🧠 Kata Paling Berpengaruh")
-    features = vectorizer.get_feature_names_out()
-    cols = st.columns(3)
-    colors = {0:"#EF553B", 1:"#636EFA", 2:"#00CC96"}
-    for i, lbl in enumerate([0,1,2]):
-        with cols[i]:
-            log_probs = model.feature_log_prob_[lbl]
+    st.subheader("🧠 Kata-Kata Paling Berpengaruh")
+    
+    # Ambil kata-kata paling penting dari model
+    feature_names = vectorizer.get_feature_names_out()
+    
+    col1, col2, col3 = st.columns(3)
+    sentiment_colors = {
+        0: '#EF553B',  # Negatif
+        1: '#636EFA',  # Netral
+        2: '#00CC96'   # Positif
+    }
+    
+    for i, label in enumerate([0, 1, 2]):
+        with [col1, col2, col3][i]:
+            # Dapatkan probabilitas log untuk kelas ini
+            class_prob = model.feature_log_prob_[i]
+            
+            # Ambil 10 fitur teratas
             topn = 10
-            idxs = np.argsort(log_probs)[-topn:][::-1]
-            top_feats = [(features[j], np.exp(log_probs[j])) for j in idxs]
-            df_top = pd.DataFrame(top_feats, columns=["Kata","Skor"])
-            fig = px.bar(df_top, x="Skor", y="Kata", orientation="h",
-                         title=f"Top {topn} {sentiment_labels[lbl]}",
-                         color_discrete_sequence=[colors[lbl]], height=350)
+            top_indices = np.argsort(class_prob)[-topn:][::-1]
+            top_features = [(feature_names[j], np.exp(class_prob[j])) for j in top_indices]
+            
+            # Buat dataframe untuk visualisasi
+            df_top = pd.DataFrame(top_features, columns=['Kata', 'Skor'])
+            
+            # Visualisasi
+            fig = px.bar(
+                df_top, 
+                y='Kata', 
+                x='Skor',
+                orientation='h',
+                title=f"Top {topn} Kata untuk {sentiment_labels[label]}",
+                color_discrete_sequence=[sentiment_colors[label]],
+                height=400
+            )
             fig.update_layout(showlegend=False)
             st.plotly_chart(fig, use_container_width=True)
-
+    
     st.subheader("🔎 Analisis Kata Kunci")
-    keyword = st.text_input("Cari kata kunci:")
+    keyword = st.text_input("Cari kata kunci spesifik:")
+    
     if keyword:
-        kw = preprocess_text(keyword)
+        keyword_clean = preprocess_text(keyword)
         try:
-            idx = list(features).index(kw)
-            scores = [np.exp(model.feature_log_prob_[i][idx]) for i in range(3)]
-            df_kw = pd.DataFrame({
-                "Sentimen": ["Negatif","Netral","Positif"],
-                "Skor": scores
-            })
-            fig = px.bar(df_kw, x="Sentimen", y="Skor",
-                         color="Sentimen",
-                         color_discrete_map={
-                             "Negatif":"#EF553B",
-                             "Netral":"#636EFA",
-                             "Positif":"#00CC96"
-                         }, height=350)
+            idx = list(feature_names).index(keyword_clean)
+            
+            # Dapatkan probabilitas untuk setiap kelas
+            class_probs = [np.exp(model.feature_log_prob_[i][idx]) for i in range(3)]
+            
+            # Visualisasi
+            fig = px.bar(
+                x=['Negatif', 'Netral', 'Positif'],
+                y=class_probs,
+                color=['Negatif', 'Netral', 'Positif'],
+                color_discrete_map={
+                    'Negatif': '#EF553B', 
+                    'Netral': '#636EFA', 
+                    'Positif': '#00CC96'
+                },
+                labels={'x': 'Sentimen', 'y': 'Skor Pengaruh'},
+                title=f"Pengaruh Kata: '{keyword_clean}'",
+                height=400
+            )
             st.plotly_chart(fig, use_container_width=True)
-            best = np.argmax(scores)
+            
+            # Tampilkan interpretasi
+            max_sentiment = np.argmax(class_probs)
             st.markdown(f"""
-                <div class="highlight">
-                Kata **'{kw}'** paling memengaruhi **{sentiment_labels[best]}**
-                (skor: {scores[best]:.4f})
-                </div>
+            <div class="highlight">
+            <b>Interpretasi:</b> Kata <b>'{keyword_clean}'</b> memiliki pengaruh terkuat terhadap sentimen 
+            <b>{sentiment_labels[max_sentiment]}</b> dengan skor <b>{class_probs[max_sentiment]:.4f}</b>
+            </div>
             """, unsafe_allow_html=True)
+            
         except ValueError:
-            st.warning(f"Kata '{kw}' tidak ditemukan.")
+            st.warning(f"Kata '{keyword_clean}' tidak ditemukan dalam model")
