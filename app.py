@@ -149,7 +149,7 @@ with tab1:
     st.markdown(f"""
     <div class="">
     <b>Dataset Pawon Mbah Gito</b><br>
-    - <b>Data</b>: {len(df)}<br>
+    - <b>Data</b>: 2154<br>
     - <b>Ulasan</b>: Teks ulasan pelanggan<br>
     - <b>Rating</b>: Nilai rating 1–5<br>
     - <b>Sentimen</b>: Kategori sentimen (Negatif, Netral, Positif)
