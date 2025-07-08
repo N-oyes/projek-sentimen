@@ -146,7 +146,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.subheader("📄 Data & Preprocessing")
     with st.expander("ℹ️ Info Dataset"):
-       with st.expander("ℹ️ Info Dataset"):
     st.markdown(f"""
     <div class="">
     <b>Dataset Pawon Mbah Gito</b><br>
