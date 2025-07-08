@@ -146,13 +146,16 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 with tab1:
     st.subheader("📄 Data & Preprocessing")
     with st.expander("ℹ️ Info Dataset"):
-        st.markdown(f"""
-        <div class="highlight">
-        <b>Dataset Pawon Mbah Gito</b><br>
-        Total baris setelah cleaning: <b>{len(df)}</b><br>
-        Kolom: Ulasan, Rating, cleaned_text, sentiment
-        </div>
-        """, unsafe_allow_html=True)
+       with st.expander("ℹ️ Info Dataset"):
+    st.markdown(f"""
+    <div class="">
+    <b>Dataset Pawon Mbah Gito</b><br>
+    - <b>Data</b>: {len(df)}<br>
+    - <b>Ulasan</b>: Teks ulasan pelanggan<br>
+    - <b>Rating</b>: Nilai rating 1–5<br>
+    - <b>Sentimen</b>: Kategori sentimen (Negatif, Netral, Positif)
+    </div>
+    """, unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
