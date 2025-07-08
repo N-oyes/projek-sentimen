@@ -11,9 +11,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from wordcloud import WordCloud
-from imblearn.over_sampling import RandomOverSampler
+from imblearn.over_sampling import SMOTE  # Ganti RandomOverSampler dengan SMOTE
 from Sastrawi.Stemmer.StemmerFactory import StemmerFactory
 from collections import Counter
+from sklearn.utils import resample  # Untuk manual oversampling
 
 # -------------------- KONFIGURASI HALAMAN --------------------
 st.set_page_config(page_title="Analisis Sentimen Pawon", layout="wide")
@@ -116,13 +117,29 @@ X = vectorizer.fit_transform(df['cleaned_text']).toarray()
 y = df['sentiment'].values
 texts = df['cleaned_text'].values
 
-ros = RandomOverSampler(random_state=42)
-X_resampled, y_resampled = ros.fit_resample(X, y)
-resampled_indices = ros.sample_indices_
-texts_resampled = texts[resampled_indices]
+# SOLUSI: Ganti RandomOverSampler dengan metode manual
+# Hitung jumlah maksimum sampel
+max_size = df['sentimen_label'].value_counts().max()
 
-df_oversampled = pd.DataFrame({'sentiment': y_resampled})
-df_oversampled['sentimen_label'] = df_oversampled['sentiment'].map(sentiment_labels)
+# Lakukan oversampling manual untuk setiap kelas
+dfs = []
+for label in [0, 1, 2]:
+    df_class = df[df['sentiment'] == label]
+    if len(df_class) < max_size:
+        # Oversample kelas minoritas
+        df_class = resample(df_class, 
+                           replace=True, 
+                           n_samples=max_size, 
+                           random_state=42)
+    dfs.append(df_class)
+
+# Gabungkan hasil oversampling
+df_oversampled = pd.concat(dfs)
+
+# Ekstrak fitur untuk data yang sudah dioversampling
+X_resampled = vectorizer.transform(df_oversampled['cleaned_text']).toarray()
+y_resampled = df_oversampled['sentiment'].values
+texts_resampled = df_oversampled['cleaned_text'].values
 
 # -------------------- SPLIT & TRAINING --------------------
 indices = np.arange(len(X_resampled))
@@ -140,7 +157,7 @@ conf_matrix = confusion_matrix(y_test, y_pred)
 
 # Buat DataFrame untuk hasil prediksi
 df_result = pd.DataFrame({
-    'Teks Asli': df.iloc[resampled_indices[idx_test]]['Ulasan'].values,
+    'Teks Asli': df_oversampled.iloc[idx_test]['Ulasan'].values,
     'Teks Bersih': texts_resampled[idx_test],
     'Aktual': y_test,
     'Prediksi': y_pred
@@ -159,13 +176,13 @@ with tab1:
         st.markdown("""
         <div class="highlight">
         <b>Dataset Ulasan Restoran Pawon Mbah Gito</b><br>
-        - <b>Data</b>: 2154<br>
+        - <b>Data</b>: {0}<br>
         - <b>Ulasan</b>: Teks ulasan pelanggan<br>
         - <b>Rating</b>: Nilai rating 1-5<br>
         - <b>Sentimen</b>: Kategori sentimen (Negatif, Netral, Positif)
 
         </div>
-        """, unsafe_allow_html=True)
+        """.format(len(df)), unsafe_allow_html=True)
     
     col1, col2 = st.columns([1, 1])
     
@@ -270,10 +287,6 @@ with tab2:
                      use_container_width=True)
     else:
         st.success("✅ Tidak ada kesalahan prediksi!")
-
- # 🔍 Kesimpulan:
-    # Model sangat baik dalam mengenali ulasan negatif dan netral, namun perlu ditingkatkan dalam membedakan ulasan positif yang tidak eksplisit.
-    # Preprocessing tambahan seperti lemmatization atau penyesuaian stopwords bisa membantu meningkatkan performa di kelas positif.
 
 # -------------------- TAB 3: WORD CLOUD --------------------
 with tab3:
