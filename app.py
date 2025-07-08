@@ -262,14 +262,18 @@ with tab2:
     ))
 
     st.subheader("🔍 Analisis Kesalahan Prediksi")
-    mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+   mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+
+if not mismatch.empty:
+    st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
     
-    if not mismatch.empty:
-        st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
-        st.dataframe(mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']].head(min(5, len(mismatch))), 
-                     use_container_width=True)
-    else:
-        st.success("✅ Tidak ada kesalahan prediksi!")
+    # Pilih sample acak
+    n_show = min(5, len(mismatch))
+    sampled_mismatch = mismatch.sample(n=n_show, random_state=None).copy()
+    
+    st.dataframe(sampled_mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']], use_container_width=True)
+else:
+    st.success("✅ Tidak ada kesalahan prediksi!")
 
  # 🔍 Kesimpulan:
     # Model sangat baik dalam mengenali ulasan negatif dan netral, namun perlu ditingkatkan dalam membedakan ulasan positif yang tidak eksplisit.
