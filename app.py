@@ -6,9 +6,11 @@ import re
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
+import plotly.graph_objects as go
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from wordcloud import WordCloud
 from imblearn.over_sampling import RandomOverSampler
@@ -50,7 +52,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">📊 Analisis Sentimen Pawon Mbah Gito</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Menggunakan Metode Naive Bayes</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Perbandingan Model Naive Bayes vs Random Forest</div>', unsafe_allow_html=True)
 
 # -------------------- LOAD DATA --------------------
 try:
@@ -137,29 +139,40 @@ texts_resampled = texts[resampled_indices]
 df_oversampled = pd.DataFrame({'sentiment': y_resampled})
 df_oversampled['sentimen_label'] = df_oversampled['sentiment'].map(sentiment_labels)
 
-# -------------------- SPLIT & TRAINING --------------------
-indices = np.arange(len(X_resampled))
+# -------------------- SPLIT DATA --------------------
 X_train, X_test, y_train, y_test, idx_train, idx_test = train_test_split(
-    X_resampled, y_resampled, indices, test_size=0.2, random_state=42, stratify=y_resampled
+    X_resampled, y_resampled, np.arange(len(X_resampled)), 
+    test_size=0.2, random_state=42, stratify=y_resampled
 )
 
-model = MultinomialNB()
-model.fit(X_train, y_train)
-y_pred = model.predict(X_test)
+# -------------------- TRAINING & EVALUASI --------------------
+# Model Naive Bayes
+nb_model = MultinomialNB()
+nb_model.fit(X_train, y_train)
+y_pred_nb = nb_model.predict(X_test)
+acc_nb = accuracy_score(y_test, y_pred_nb)
+report_nb = classification_report(y_test, y_pred_nb, target_names=['Negatif', 'Netral', 'Positif'], output_dict=True)
+conf_matrix_nb = confusion_matrix(y_test, y_pred_nb)
 
-acc = accuracy_score(y_test, y_pred)
-report = classification_report(y_test, y_pred, target_names=['Negatif', 'Netral', 'Positif'], output_dict=True)
-conf_matrix = confusion_matrix(y_test, y_pred)
+# Model Random Forest
+rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+rf_model.fit(X_train, y_train)
+y_pred_rf = rf_model.predict(X_test)
+acc_rf = accuracy_score(y_test, y_pred_rf)
+report_rf = classification_report(y_test, y_pred_rf, target_names=['Negatif', 'Netral', 'Positif'], output_dict=True)
+conf_matrix_rf = confusion_matrix(y_test, y_pred_rf)
 
 # Buat DataFrame untuk hasil prediksi
 df_result = pd.DataFrame({
     'Teks Asli': df.iloc[resampled_indices[idx_test]]['Ulasan'].values,
     'Teks Bersih': texts_resampled[idx_test],
     'Aktual': y_test,
-    'Prediksi': y_pred
+    'Prediksi_NB': y_pred_nb,
+    'Prediksi_RF': y_pred_rf
 })
 df_result['Aktual_Label'] = df_result['Aktual'].map(sentiment_labels)
-df_result['Prediksi_Label'] = df_result['Prediksi'].map(sentiment_labels)
+df_result['Prediksi_NB_Label'] = df_result['Prediksi_NB'].map(sentiment_labels)
+df_result['Prediksi_RF_Label'] = df_result['Prediksi_RF'].map(sentiment_labels)
 
 # -------------------- TABS --------------------
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Data", "📈 Evaluasi", "☁ Word Cloud", "🔍 Prediksi Manual", "🧠 Fitur Penting"])
@@ -172,12 +185,12 @@ with tab1:
         st.markdown("""
         <div class="highlight">
         <b>Dataset Ulasan Restoran Pawon Mbah Gito</b><br>
-        - <b>Data</b>: 2154<br>
+        - <b>Data</b>: {} baris<br>
         - <b>Ulasan</b>: Teks ulasan pelanggan<br>
         - <b>Rating</b>: Nilai rating 1-5<br>
         - <b>Sentimen</b>: Kategori sentimen (Negatif, Netral, Positif)
         </div>
-        """, unsafe_allow_html=True)
+        """.format(len(df)), unsafe_allow_html=True)
     
     st.subheader("📊 Distribusi Rating Awal")
     fig_rating = px.histogram(df, x='Rating', nbins=5, 
@@ -214,102 +227,169 @@ with tab1:
 
 # -------------------- TAB 2: EVALUASI --------------------
 with tab2:
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.metric(label="🎯 Akurasi Model", value=f"{acc:.2%}")
-        
-        st.markdown("📋 Classification Report:")
-        report_df = pd.DataFrame(report).transpose()
-        st.dataframe(report_df.style.format({'precision': '{:.2f}', 'recall': '{:.2f}', 
-                                          'f1-score': '{:.2f}', 'support': '{:.0f}'}), 
-                   use_container_width=True)
-        
-        st.markdown("""
-        <div class="highlight">
-        <b>Penjelasan:</b> Tabel ini menunjukkan metrik evaluasi utama, yaitu precision, recall, dan f1-score untuk setiap kelas sentimen.<br>
-        - <b>Precision</b>: Seberapa tepat prediksi model pada masing-masing kelas (minim false positive).<br>
-        - <b>Recall</b>: Seberapa lengkap model mendeteksi data di kelas tersebut (minim false negative).<br>
-        - <b>F1-score</b>: Gabungan precision dan recall.<br>
-        Nilai yang tinggi menandakan performa yang baik.
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown("🧩 Confusion Matrix:")
-        fig_cm, ax_cm = plt.subplots(figsize=(8, 6))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
-                    xticklabels=['Negatif', 'Netral', 'Positif'],
-                    yticklabels=['Negatif', 'Netral', 'Positif'])
-        ax_cm.set_xlabel("Predicted")
-        ax_cm.set_ylabel("Actual")
-        plt.title('Confusion Matrix')
-        st.pyplot(fig_cm)
-        
-        st.markdown("""
-        <div class="highlight">
-        <b>Penjelasan:</b> Confusion Matrix menunjukkan jumlah prediksi yang benar (diagonal) dan salah (di luar diagonal).<br>
-        Jika kotak diagonal besar, artinya model berhasil memprediksi dengan baik pada kelas tersebut.<br>
-        Nilai di luar diagonal menunjukkan kesalahan klasifikasi antar kelas.
-        </div>
-        """, unsafe_allow_html=True)
+    st.subheader("Perbandingan Model")
     
-    with st.expander("ℹ Informasi Model"):
-        st.markdown("""
-        - *Algoritma*: Multinomial Naive Bayes
-        - *Vectorizer*: TF-IDF dengan n-gram (1,2)
-        - *Jumlah Fitur*: 5,000
-        - *Oversampling*: RandomOverSampler
-        - *Train-Test Split*: 80-20
-        """)
-    
+    # Tampilkan metrik referensi
+    st.markdown("### Metrik Referensi")
+    reference_metrics = {
+        'Metrik': ['Akurasi', 'Precision (Negatif)', 'Recall (Negatif)', 'F1-Score (Negatif)',
+                   'Precision (Netral)', 'Recall (Netral)', 'F1-Score (Netral)',
+                   'Precision (Positif)', 'Recall (Positif)', 'F1-Score (Positif)',
+                   'Macro Avg F1', 'Weighted Avg F1'],
+        'Naive Bayes': [0.91, 0.90, 0.90, 0.94, 
+                        0.89, 0.89, 0.97, 
+                        0.96, 0.96, 0.83, 
+                        0.91, 0.91],
+        'Random Forest': [0.99, 0.98, 1.00, 0.99,
+                          1.00, 1.00, 1.00,
+                          1.00, 0.98, 0.99,
+                          0.99, 0.99]
+    }
+
+    df_reference = pd.DataFrame(reference_metrics)
+    st.dataframe(df_reference.style.format({
+        'Naive Bayes': '{:.2f}',
+        'Random Forest': '{:.2f}'
+    }), use_container_width=True)
+
     st.markdown("""
-    ### 🧠 Interpretasi Hasil Evaluasi
-
-    Model Naive Bayes menunjukkan performa yang *sangat baik* secara keseluruhan dengan *akurasi sebesar {:.2f}%*.
-
-    #### 📋 Classification Report:
-    - *Negatif*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
-      → Model sangat baik dalam mengenali ulasan negatif, dengan recall hampir sempurna.
-    - *Netral*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
-      → Model cukup akurat dalam menangkap ulasan netral, meskipun ada sedikit overlap dengan kelas lain.
-    - *Positif*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
-      → Model sangat yakin saat memprediksi positif, tapi masih sering keliru mengklasifikasikan ulasan positif sebagai netral atau negatif.
-
-    #### 🧩 Confusion Matrix:
-    - Hampir semua ulasan *negatif* dan *netral* diprediksi dengan benar.
-    - Namun, *ulasan positif* sering dikira netral atau bahkan negatif.
-    - Ini menunjukkan bahwa model masih kesulitan membedakan ekspresi positif yang halus dari netral.
-
-    """.format(
-        acc*100,
-        report['Negatif']['precision'], report['Negatif']['recall'], report['Negatif']['f1-score'],
-        report['Netral']['precision'], report['Netral']['recall'], report['Netral']['f1-score'],
-        report['Positif']['precision'], report['Positif']['recall'], report['Positif']['f1-score']
-    ))
-
-    st.subheader("🔍 Analisis Kesalahan Prediksi")
-    mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+    <div class="highlight">
+    **Interpretasi Referensi:**
+    - Random Forest memiliki performa lebih baik di hampir semua metrik
+    - Akurasi Random Forest (99%) lebih tinggi dari Naive Bayes (91%)
+    - F1-Score Random Forest konsisten tinggi di semua kelas
+    </div>
+    """, unsafe_allow_html=True)
     
-    if not mismatch.empty:
-        st.markdown(f"❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
-        
-        # Pilih sample acak
-        n_show = min(5, len(mismatch))
-        sampled_mismatch = mismatch.sample(n=n_show, random_state=None).copy()
-        
-        st.dataframe(sampled_mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']], use_container_width=True)
-        
-        st.markdown("""
-        <div class="highlight">
-        <b>🔍 Kesimpulan:</b>
-        - Model sangat baik dalam mengenali ulasan negatif dan netral
-        - Perlu ditingkatkan dalam membedakan ulasan positif yang tidak eksplisit
-        - Preprocessing tambahan seperti lemmatization atau penyesuaian stopwords bisa membantu
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        st.success("✅ Tidak ada kesalahan prediksi!")
+    # Hasil aktual dari model
+    st.markdown("### Hasil Implementasi")
+    
+    # Ringkasan performa
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("🎯 Akurasi Naive Bayes", f"{acc_nb:.2%}", 
+                 delta=f"{acc_nb - 0.91:.2%}" if acc_nb > 0.91 else f"{0.91 - acc_nb:.2%} lebih rendah")
+        st.metric("🎯 Akurasi Random Forest", f"{acc_rf:.2%}", 
+                 delta=f"{acc_rf - 0.99:.2%}" if acc_rf > 0.99 else f"{0.99 - acc_rf:.2%} lebih rendah")
+    
+    # Grafik perbandingan akurasi
+    fig_acc = go.Figure()
+    fig_acc.add_trace(go.Bar(
+        x=['Naive Bayes', 'Random Forest'],
+        y=[acc_nb, acc_rf],
+        text=[f"{acc_nb:.2%}", f"{acc_rf:.2%}"],
+        textposition='auto',
+        marker_color=['#1f77b4', '#2ca02c'],
+        name='Implementasi'
+    ))
+    fig_acc.add_trace(go.Scatter(
+        x=['Naive Bayes', 'Random Forest'],
+        y=[0.91, 0.99],
+        mode='markers+text',
+        text=['Referensi', 'Referensi'],
+        textposition='top center',
+        marker=dict(size=15, color='red'),
+        name='Referensi'
+    ))
+    fig_acc.update_layout(
+        title='Perbandingan Akurasi',
+        yaxis=dict(range=[0.8, 1.05]),
+        showlegend=True
+    )
+    st.plotly_chart(fig_acc, use_container_width=True)
+    
+    # Tabel perbandingan metrik
+    st.markdown("### Detail Metrik")
+    
+    # Buat dataframe untuk perbandingan
+    metrics = [
+        'Precision (Negatif)', 'Recall (Negatif)', 'F1-Score (Negatif)',
+        'Precision (Netral)', 'Recall (Netral)', 'F1-Score (Netral)',
+        'Precision (Positif)', 'Recall (Positif)', 'F1-Score (Positif)',
+        'Macro Avg F1', 'Weighted Avg F1'
+    ]
+    
+    nb_values = [
+        report_nb['Negatif']['precision'], report_nb['Negatif']['recall'], report_nb['Negatif']['f1-score'],
+        report_nb['Netral']['precision'], report_nb['Netral']['recall'], report_nb['Netral']['f1-score'],
+        report_nb['Positif']['precision'], report_nb['Positif']['recall'], report_nb['Positif']['f1-score'],
+        report_nb['macro avg']['f1-score'], report_nb['weighted avg']['f1-score']
+    ]
+    
+    rf_values = [
+        report_rf['Negatif']['precision'], report_rf['Negatif']['recall'], report_rf['Negatif']['f1-score'],
+        report_rf['Netral']['precision'], report_rf['Netral']['recall'], report_rf['Netral']['f1-score'],
+        report_rf['Positif']['precision'], report_rf['Positif']['recall'], report_rf['Positif']['f1-score'],
+        report_rf['macro avg']['f1-score'], report_rf['weighted avg']['f1-score']
+    ]
+    
+    df_comparison = pd.DataFrame({
+        'Metrik': metrics,
+        'Naive Bayes (Implementasi)': nb_values,
+        'Random Forest (Implementasi)': rf_values,
+        'Naive Bayes (Referensi)': [0.90, 0.90, 0.94, 0.89, 0.89, 0.97, 0.96, 0.96, 0.83, 0.91, 0.91],
+        'Random Forest (Referensi)': [0.98, 1.00, 0.99, 1.00, 1.00, 1.00, 1.00, 0.98, 0.99, 0.99, 0.99]
+    })
+    
+    st.dataframe(df_comparison.style.format({
+        'Naive Bayes (Implementasi)': '{:.2f}',
+        'Random Forest (Implementasi)': '{:.2f}',
+        'Naive Bayes (Referensi)': '{:.2f}',
+        'Random Forest (Referensi)': '{:.2f}'
+    }), use_container_width=True)
+    
+    # Confusion Matrix
+    st.markdown("### Confusion Matrix")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Naive Bayes**")
+        fig_nb = px.imshow(
+            conf_matrix_nb,
+            labels=dict(x="Prediksi", y="Aktual", color="Jumlah"),
+            x=['Negatif', 'Netral', 'Positif'],
+            y=['Negatif', 'Netral', 'Positif'],
+            text_auto=True,
+            color_continuous_scale='Blues'
+        )
+        fig_nb.update_layout(title='Naive Bayes')
+        st.plotly_chart(fig_nb, use_container_width=True)
+    
+    with col2:
+        st.markdown("**Random Forest**")
+        fig_rf = px.imshow(
+            conf_matrix_rf,
+            labels=dict(x="Prediksi", y="Aktual", color="Jumlah"),
+            x=['Negatif', 'Netral', 'Positif'],
+            y=['Negatif', 'Netral', 'Positif'],
+            text_auto=True,
+            color_continuous_scale='Greens'
+        )
+        fig_rf.update_layout(title='Random Forest')
+        st.plotly_chart(fig_rf, use_container_width=True)
+    
+    # Analisis perbedaan
+    st.markdown("### Analisis Perbedaan")
+    st.markdown(f"""
+    **🔍 Perbandingan Implementasi vs Referensi:**
+    - **Akurasi Naive Bayes**: Referensi 91% vs Implementasi {acc_nb:.2%} ({'+' if acc_nb > 0.91 else ''}{acc_nb - 0.91:.2%})
+    - **Akurasi Random Forest**: Referensi 99% vs Implementasi {acc_rf:.2%} ({'+' if acc_rf > 0.99 else ''}{acc_rf - 0.99:.2%})
+    
+    **📊 Distribusi Kesalahan:**
+    - Naive Bayes: {conf_matrix_nb.sum() - np.trace(conf_matrix_nb)} kesalahan
+    - Random Forest: {conf_matrix_rf.sum() - np.trace(conf_matrix_rf)} kesalahan
+    
+    **💡 Rekomendasi:**
+    - Untuk akurasi tertinggi, gunakan Random Forest
+    - Untuk kecepatan dan interpretabilitas, gunakan Naive Bayes
+    
+    **⚠ Catatan:**
+    Perbedaan hasil implementasi dengan referensi bisa disebabkan oleh:
+    1. Perbedaan dataset yang digunakan
+    2. Variasi dalam teknik preprocessing
+    3. Perbedaan parameter model
+    4. Random seed yang berbeda
+    """)
     
     st.download_button(
         label="📥 Download Hasil Prediksi",
@@ -371,27 +451,32 @@ with tab4:
                 try:
                     cleaned = preprocess_text(user_input)
                     vectorized = vectorizer.transform([cleaned]).toarray()
-                    prediction = model.predict(vectorized)[0]
-                    probs = model.predict_proba(vectorized)[0]
                     
-                    col1, col2 = st.columns([1, 2])
+                    # Prediksi untuk kedua model
+                    prediction_nb = nb_model.predict(vectorized)[0]
+                    probs_nb = nb_model.predict_proba(vectorized)[0]
+                    
+                    prediction_rf = rf_model.predict(vectorized)[0]
+                    probs_rf = rf_model.predict_proba(vectorized)[0]
+                    
+                    col1, col2 = st.columns([1, 1])
                     
                     with col1:
+                        st.markdown("### Naive Bayes")
                         st.markdown(f"🧹 Hasil Preprocessing:")
                         st.code(cleaned, language='text')
                         
-                        st.success(f"✅ Prediksi Sentimen: *{sentiment_labels[prediction]}*")
-                        st.metric("Confidence Score", f"{max(probs)*100:.1f}%")
-                    
-                    with col2:
+                        st.success(f"✅ Prediksi Sentimen: *{sentiment_labels[prediction_nb]}*")
+                        st.metric("Confidence Score", f"{max(probs_nb)*100:.1f}%")
+                        
                         st.markdown("📊 Distribusi Probabilitas:")
-                        prob_df = pd.DataFrame({
+                        prob_df_nb = pd.DataFrame({
                             'Sentimen': ['Negatif', 'Netral', 'Positif'],
-                            'Probabilitas': probs
+                            'Probabilitas': probs_nb
                         })
                         
-                        fig_prob = px.bar(
-                            prob_df, 
+                        fig_prob_nb = px.bar(
+                            prob_df_nb, 
                             x='Sentimen', 
                             y='Probabilitas',
                             color='Sentimen',
@@ -403,13 +488,48 @@ with tab4:
                             text='Probabilitas',
                             height=300
                         )
-                        fig_prob.update_traces(texttemplate='%{text:.3f}', textposition='outside')
-                        fig_prob.update_layout(
+                        fig_prob_nb.update_traces(texttemplate='%{text:.3f}', textposition='outside')
+                        fig_prob_nb.update_layout(
                             yaxis_title='Probabilitas',
                             xaxis_title='',
                             showlegend=False
                         )
-                        st.plotly_chart(fig_prob, use_container_width=True)
+                        st.plotly_chart(fig_prob_nb, use_container_width=True)
+                    
+                    with col2:
+                        st.markdown("### Random Forest")
+                        st.markdown(f"🧹 Hasil Preprocessing:")
+                        st.code(cleaned, language='text')
+                        
+                        st.success(f"✅ Prediksi Sentimen: *{sentiment_labels[prediction_rf]}*")
+                        st.metric("Confidence Score", f"{max(probs_rf)*100:.1f}%")
+                        
+                        st.markdown("📊 Distribusi Probabilitas:")
+                        prob_df_rf = pd.DataFrame({
+                            'Sentimen': ['Negatif', 'Netral', 'Positif'],
+                            'Probabilitas': probs_rf
+                        })
+                        
+                        fig_prob_rf = px.bar(
+                            prob_df_rf, 
+                            x='Sentimen', 
+                            y='Probabilitas',
+                            color='Sentimen',
+                            color_discrete_map={
+                                'Negatif': '#EF553B', 
+                                'Netral': '#636EFA', 
+                                'Positif': '#00CC96'
+                            },
+                            text='Probabilitas',
+                            height=300
+                        )
+                        fig_prob_rf.update_traces(texttemplate='%{text:.3f}', textposition='outside')
+                        fig_prob_rf.update_layout(
+                            yaxis_title='Probabilitas',
+                            xaxis_title='',
+                            showlegend=False
+                        )
+                        st.plotly_chart(fig_prob_rf, use_container_width=True)
                         
                 except Exception as e:
                     st.error(f"❌ Terjadi kesalahan saat memproses: {e}")
@@ -431,7 +551,7 @@ with tab5:
     for i, label in enumerate([0, 1, 2]):
         with [col1, col2, col3][i]:
             # Dapatkan probabilitas log untuk kelas ini
-            class_prob = model.feature_log_prob_[i]
+            class_prob = nb_model.feature_log_prob_[i]
             
             # Ambil 10 fitur teratas
             topn = 10
@@ -463,7 +583,7 @@ with tab5:
             idx = list(feature_names).index(keyword_clean)
             
             # Dapatkan probabilitas untuk setiap kelas
-            class_probs = [np.exp(model.feature_log_prob_[i][idx]) for i in range(3)]
+            class_probs = [np.exp(nb_model.feature_log_prob_[i][idx]) for i in range(3)]
             
             # Visualisasi
             fig = px.bar(
@@ -491,4 +611,4 @@ with tab5:
             """, unsafe_allow_html=True)
             
         except ValueError:
-            st.warning(f"Kata '{keyword_clean}' tidak ditemukan dalam model")
+            st.warning(f"Kata '{keyword_clean}' tidak ditemukan dalam model")
