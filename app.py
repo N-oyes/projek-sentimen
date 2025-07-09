@@ -149,13 +149,13 @@ df_result['Aktual_Label'] = df_result['Aktual'].map(sentiment_labels)
 df_result['Prediksi_Label'] = df_result['Prediksi'].map(sentiment_labels)
 
 # -------------------- TABS --------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Data", "📈 Evaluasi", "☁️ Word Cloud", "🔍 Prediksi Manual", "🧠 Fitur Penting"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📄 Data", "📈 Evaluasi", "☁ Word Cloud", "🔍 Prediksi Manual", "🧠 Fitur Penting"])
 
 # -------------------- TAB 1: DATA --------------------
 with tab1:
     st.subheader("📄 Data Awal dan Hasil Preprocessing")
     
-    with st.expander("ℹ️ Informasi Dataset"):
+    with st.expander("ℹ Informasi Dataset"):
         st.markdown("""
         <div class="highlight">
         <b>Dataset Ulasan Restoran Pawon Mbah Gito</b><br>
@@ -170,25 +170,25 @@ with tab1:
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.markdown("**📌 Contoh Data Asli:**")
+        st.markdown("📌 Contoh Data Asli:")
         st.dataframe(df[['Ulasan', 'Rating']].head(5), use_container_width=True)
         
     with col2:
-        st.markdown("**🧹 Contoh Hasil Preprocessing:**")
+        st.markdown("🧹 Contoh Hasil Preprocessing:")
         st.dataframe(df[['cleaned_text', 'sentimen_label']].head(5), use_container_width=True)
     
     st.subheader("📊 Distribusi Sentimen")
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.markdown("**Sebelum Oversampling**")
+        st.markdown("*Sebelum Oversampling*")
         fig1 = px.pie(df, names='sentimen_label', title='Distribusi Sentimen Awal', 
                       hole=0.4, color='sentimen_label',
                       color_discrete_map={'Negatif': '#EF553B', 'Netral': '#636EFA', 'Positif': '#00CC96'})
         st.plotly_chart(fig1, use_container_width=True)
         
     with col2:
-        st.markdown("**Setelah Oversampling**")
+        st.markdown("*Setelah Oversampling*")
         fig2 = px.pie(df_oversampled, names='sentimen_label', title='Distribusi Setelah Oversampling', 
                       hole=0.4, color='sentimen_label',
                       color_discrete_map={'Negatif': '#EF553B', 'Netral': '#636EFA', 'Positif': '#00CC96'})
@@ -201,7 +201,7 @@ with tab2:
     with col1:
         st.metric(label="🎯 Akurasi Model", value=f"{acc:.2%}")
         
-        st.markdown("**📋 Classification Report:**")
+        st.markdown("📋 Classification Report:")
         report_df = pd.DataFrame(report).transpose()
         st.dataframe(report_df.style.format({'precision': '{:.2f}', 'recall': '{:.2f}', 
                                           'f1-score': '{:.2f}', 'support': '{:.0f}'}), 
@@ -218,7 +218,7 @@ with tab2:
         """, unsafe_allow_html=True)
 
     with col2:
-        st.markdown("**🧩 Confusion Matrix:**")
+        st.markdown("🧩 Confusion Matrix:")
         fig_cm, ax_cm = plt.subplots(figsize=(8, 6))
         sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
                     xticklabels=['Negatif', 'Netral', 'Positif'],
@@ -239,19 +239,19 @@ with tab2:
     st.markdown("""
     ### 🧠 Interpretasi Hasil Evaluasi
 
-    Model Naive Bayes menunjukkan performa yang **sangat baik** secara keseluruhan dengan **akurasi sebesar {:.2f}%**.
+    Model Naive Bayes menunjukkan performa yang *sangat baik* secara keseluruhan dengan *akurasi sebesar {:.2f}%*.
 
     #### 📋 Classification Report:
-    - **Negatif**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+    - *Negatif*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
       → Model sangat baik dalam mengenali ulasan negatif, dengan recall hampir sempurna.
-    - **Netral**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+    - *Netral*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
       → Model cukup akurat dalam menangkap ulasan netral, meskipun ada sedikit overlap dengan kelas lain.
-    - **Positif**: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
+    - *Positif*: Precision {:.2f}, Recall {:.2f}, F1-score {:.2f}  
       → Model sangat yakin saat memprediksi positif, tapi masih sering keliru mengklasifikasikan ulasan positif sebagai netral atau negatif.
 
     #### 🧩 Confusion Matrix:
-    - Hampir semua ulasan **negatif** dan **netral** diprediksi dengan benar.
-    - Namun, **ulasan positif** sering dikira netral atau bahkan negatif.
+    - Hampir semua ulasan *negatif* dan *netral* diprediksi dengan benar.
+    - Namun, *ulasan positif* sering dikira netral atau bahkan negatif.
     - Ini menunjukkan bahwa model masih kesulitan membedakan ekspresi positif yang halus dari netral.
 
     """.format(
@@ -265,7 +265,7 @@ with tab2:
     mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
 
 if not mismatch.empty:
-    st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
+    st.markdown(f"❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
     
     # Pilih sample acak
     n_show = min(5, len(mismatch))
@@ -281,7 +281,7 @@ else:
 
 # -------------------- TAB 3: WORD CLOUD --------------------
 with tab3:
-    st.subheader("☁️ Word Cloud per Sentimen")
+    st.subheader("☁ Word Cloud per Sentimen")
     col1, col2, col3 = st.columns(3)
     
     sentiment_colors = {
@@ -317,9 +317,9 @@ with tab4:
     
     with st.expander("💡 Tips Ulasan Contoh"):
         st.markdown("""
-        - **Positif**: "Rasanya enak banget, pelayanan ramah dan harga terjangkau"
-        - **Netral**: “Makanan disajikan dalam piring biasa, tidak terlalu besar atau kecil.”
-        - **Negatif**: "Kebersihannya kurang, bahkan saya melihat meja yang belum dibersihkan.”
+        - *Positif*: "Rasanya enak banget, pelayanan ramah dan harga terjangkau"
+        - *Netral*: “Makanan disajikan dalam piring biasa, tidak terlalu besar atau kecil.”
+        - *Negatif*: "Kebersihannya kurang, bahkan saya melihat meja yang belum dibersihkan.”
 
         """)
     
@@ -327,7 +327,7 @@ with tab4:
     
     if st.button("Prediksi", type="primary"):
         if not user_input.strip():
-            st.warning("⚠️ Mohon masukkan teks ulasan terlebih dahulu.")
+            st.warning("⚠ Mohon masukkan teks ulasan terlebih dahulu.")
         else:
             with st.spinner("🔄 Sedang memproses ulasan..."):
                 try:
@@ -339,14 +339,14 @@ with tab4:
                     col1, col2 = st.columns([1, 2])
                     
                     with col1:
-                        st.markdown(f"**🧹 Hasil Preprocessing:**")
+                        st.markdown(f"🧹 Hasil Preprocessing:")
                         st.code(cleaned, language='text')
                         
-                        st.success(f"✅ Prediksi Sentimen: **{sentiment_labels[prediction]}**")
+                        st.success(f"✅ Prediksi Sentimen: *{sentiment_labels[prediction]}*")
                         st.metric("Confidence Score", f"{max(probs)*100:.1f}%")
                     
                     with col2:
-                        st.markdown("**📊 Distribusi Probabilitas:**")
+                        st.markdown("📊 Distribusi Probabilitas:")
                         prob_df = pd.DataFrame({
                             'Sentimen': ['Negatif', 'Netral', 'Positif'],
                             'Probabilitas': probs
@@ -453,4 +453,4 @@ with tab5:
             """, unsafe_allow_html=True)
             
         except ValueError:
-            st.warning(f"Kata '{keyword_clean}' tidak ditemukan dalam model")
+            st.warning(f"Kata '{keyword_clean}' tidak ditemukan dalam model")
