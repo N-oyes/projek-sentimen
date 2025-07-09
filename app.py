@@ -163,6 +163,7 @@ with tab1:
         - <b>Ulasan</b>: Teks ulasan pelanggan<br>
         - <b>Rating</b>: Nilai rating 1-5<br>
         - <b>Sentimen</b>: Kategori sentimen (Negatif, Netral, Positif)
+
         </div>
         """, unsafe_allow_html=True)
     
@@ -262,18 +263,21 @@ with tab2:
 
     st.subheader("🔍 Analisis Kesalahan Prediksi")
     mismatch = df_result[df_result['Aktual'] != df_result['Prediksi']]
+
+if not mismatch.empty:
+    st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
     
-    if not mismatch.empty:
-        st.markdown(f"**❌ Total Kesalahan:** {len(mismatch)} dari {len(df_result)} data ({len(mismatch)/len(df_result):.2%})")
-        
-        # Pilih sample acak
-        n_show = min(5, len(mismatch))
-        sampled_mismatch = mismatch.sample(n=n_show, random_state=None).copy()
-        
-        st.dataframe(sampled_mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']], 
-                     use_container_width=True)
-    else:
-        st.success("✅ Tidak ada kesalahan prediksi!")
+    # Pilih sample acak
+    n_show = min(5, len(mismatch))
+    sampled_mismatch = mismatch.sample(n=n_show, random_state=None).copy()
+    
+    st.dataframe(sampled_mismatch[['Teks Asli', 'Aktual_Label', 'Prediksi_Label']], use_container_width=True)
+else:
+    st.success("✅ Tidak ada kesalahan prediksi!")
+
+ # 🔍 Kesimpulan:
+    # Model sangat baik dalam mengenali ulasan negatif dan netral, namun perlu ditingkatkan dalam membedakan ulasan positif yang tidak eksplisit.
+    # Preprocessing tambahan seperti lemmatization atau penyesuaian stopwords bisa membantu meningkatkan performa di kelas positif.
 
 # -------------------- TAB 3: WORD CLOUD --------------------
 with tab3:
@@ -316,6 +320,7 @@ with tab4:
         - **Positif**: "Rasanya enak banget, pelayanan ramah dan harga terjangkau"
         - **Netral**: “Makanan disajikan dalam piring biasa, tidak terlalu besar atau kecil.”
         - **Negatif**: "Kebersihannya kurang, bahkan saya melihat meja yang belum dibersihkan.”
+
         """)
     
     user_input = st.text_area("Masukkan ulasan:", height=150)
